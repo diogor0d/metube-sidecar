@@ -171,18 +171,15 @@ def metube_payload(
     # from quality/format/video_codec. Preserve those semantics for existing
     # Shortcuts that previously posted directly to MeTube. The job folder remains
     # sidecar-controlled so the resulting file can be correlated safely.
-    legacy_fields = {"quality", "format", "video_codec"}
+    legacy_fields = {"quality", "format", "codec", "video_codec"}
     if "download_type" not in supplied_fields and supplied_fields & legacy_fields:
-        payload = {"url": request.url, "folder": folder}
-        for field in ("quality", "format", "video_codec"):
-            value = getattr(request, field)
-            if field in supplied_fields and value is not None:
-                payload[field] = value
-
-        # Accept the newer field name as a convenience for legacy-shaped bodies.
-        if "codec" in supplied_fields and "video_codec" not in payload:
-            payload["video_codec"] = request.codec
-        return payload
+        return {
+            "url": request.url,
+            "quality": request.quality,
+            "format": request.format,
+            "video_codec": request.video_codec or request.codec,
+            "folder": folder,
+        }
 
     return {
         "url": request.url,

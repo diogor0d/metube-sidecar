@@ -54,6 +54,7 @@ def test_job_lifecycle_and_file_delivery(tmp_path: Path) -> None:
         assert f'"folder":"sidecar/{job_id}"' in payload
         assert '"format":"ios"' in payload
         assert '"codec":"h264"' in payload
+        assert '"quality":"best"' in payload
 
         output_dir = settings.downloads_dir / "sidecar" / job_id
         output_dir.mkdir(parents=True)
@@ -123,6 +124,27 @@ def test_legacy_audio_format_is_left_for_metube_to_migrate(tmp_path: Path) -> No
     payload = json.loads(str(captured["json"]))
     assert payload["quality"] == "best"
     assert payload["format"] == "m4a"
+    assert "download_type" not in payload
+
+
+def test_legacy_partial_options_use_sidecar_defaults(tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+    app = create_app(settings_for(tmp_path), accepting_transport(captured))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/jobs",
+            json={
+                "url": "https://example.com/video",
+                "quality": "1080",
+            },
+        )
+
+    assert response.status_code == 202
+    payload = json.loads(str(captured["json"]))
+    assert payload["quality"] == "1080"
+    assert payload["format"] == "ios"
+    assert payload["video_codec"] == "h264"
     assert "download_type" not in payload
 
 

@@ -122,8 +122,8 @@ For example:
 For compatibility with existing sidecar-oriented Shortcuts, `codec` in a
 legacy-shaped body is translated to MeTube's legacy `video_codec` field. Requests
 that explicitly provide `download_type` continue to use MeTube's current schema.
-URL-only requests continue to default to `format=ios`, `codec=h264`, and
-`quality=best`.
+Omitted legacy fields and URL-only requests default to `format=ios`, `codec=h264`,
+and `quality=best`.
 
 ## iOS Shortcut flow
 

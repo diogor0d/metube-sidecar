@@ -13,24 +13,24 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
   documentation are implemented locally.
 - The sidecar is deployed on `diogoserver`, reachable through the dedicated
   Cloudflare Access-protected hostname, and passed a phone-to-Photos test.
-- A local, uncommitted compatibility change makes `POST /jobs` preserve the legacy
-  MeTube `/add` option shape used by the existing Shortcut while retaining the
-  current URL-only defaults.
+- Commit `13a6192` makes `POST /jobs` preserve the legacy MeTube `/add` option shape
+  used by the existing Shortcut. A local follow-up now fills omitted legacy fields
+  with the sidecar defaults.
 - The API supports job creation, polling, persistent metadata, stable-file detection,
   optional secondary API-key authentication, and attachment delivery.
 - Cloudflare credentials are not stored in the implementation.
-- The baseline implementation is committed and available from the configured
-  GitHub remote. The compatibility change is not committed, pushed, or deployed.
+- The compatibility commit is available from the configured GitHub remote. The
+  default-value follow-up is not committed, pushed, or deployed.
 
 ## Git state
 
 - Repository: `C:/Users/diogo/Documents/Projetos/metube-sidecar`
 - Branch: `main`
-- HEAD: `6397fb5d898fd535bcc279220cf890ee0d5f0677`
-- Upstream: `origin/main`; synchronized at `6397fb5d898fd535bcc279220cf890ee0d5f0677`
+- HEAD: `13a6192cc2a6e6a1b43189ca1bf949030977d9dd`
+- Upstream: `origin/main`; synchronized at `13a6192cc2a6e6a1b43189ca1bf949030977d9dd`
 - Remote: `origin` is `https://github.com/diogor0d/metube-sidecar.git`
 - Working tree: `app/main.py`, `tests/test_app.py`, `README.md`, and `HANDOFF.md`
-  are modified; nothing is staged
+  contain the uncommitted default-value follow-up; nothing is staged
 
 ## Changes
 
@@ -50,19 +50,18 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 
 ## Verification
 
-- `python -m pytest -q`: passed after the compatibility change on 2026-07-16,
-  6 tests.
+- `python -m pytest -q`: passed after the compatibility/default change on
+  2026-07-16, 7 tests.
 - `python -m compileall -q app tests`: passed on 2026-07-16.
 - `docker compose -f docker-compose.example.yml config --quiet`: passed on
   2026-07-16.
-- `git diff --check`: passed on 2026-07-16; because the implementation is
-  untracked, a separate trailing-whitespace scan was also clean.
+- `git diff --check`: passed on 2026-07-16.
 - Current upstream MeTube source review: the request schema accepts
   `download_type=video`, `codec=h264`, `format=ios`, `quality=best`, and nested
   `folder` values, and successful `/add` calls return `status=ok`.
-- Production verification before the compatibility change: sidecar health, public
-  Cloudflare Service Auth, job creation, polling, MP4 retrieval, and iOS Photos save
-  passed. The changed image has not been built or deployed.
+- Production verification before the compatibility/default changes: sidecar health,
+  public Cloudflare Service Auth, job creation, polling, MP4 retrieval, and iOS
+  Photos save passed. The changed image has not been built or deployed.
 
 ## Decisions and constraints
 
@@ -80,7 +79,7 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 
 ## Risks and blockers
 
-- The compatibility change still needs an authorized commit/push and a user-run
+- The default-value follow-up still needs an authorized commit/push and a user-run
   pull/rebuild on `diogoserver` before the old Shortcut selectors can be retested.
 - Current MeTube deduplicates a URL that is already queued or pending but still
   returns `status=ok`. A simultaneous duplicate sidecar submission would not get
@@ -91,7 +90,7 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 
 ## Next actions
 
-1. Review the compatibility diff, then commit and push only with explicit user
+1. Review the default-value follow-up, then commit and push only with explicit user
    authorization.
 2. On `diogoserver`, pull the authorized commit and rebuild/recreate the sidecar.
 3. Restore the existing Shortcut's `quality`, `format`, and codec fields and perform
@@ -102,7 +101,7 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 ## Resume instructions
 
 1. Check out `main` and obtain commit
-   `6397fb5d898fd535bcc279220cf890ee0d5f0677` from `origin/main`.
+   `13a6192cc2a6e6a1b43189ca1bf949030977d9dd` from `origin/main`.
 2. Read `AGENTS.md`, this file, `README.md`, `app/main.py`, and
    `docker-compose.example.yml` completely.
 3. Verify the branch, HEAD, remote/upstream, and working tree. Report discrepancies
