@@ -2,35 +2,32 @@
 
 ## Objective
 
-Deploy a secure MeTube sidecar behind Cloudflare Access so an iOS Shortcut can
-submit a video, poll for completion, retrieve the resulting file, and save it to
-Photos. Success requires a working container deployment on the Ubuntu server, a
-Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
+Operate a secure MeTube sidecar behind Cloudflare Access so an iOS Shortcut can
+submit media, poll for completion, retrieve the resulting file, and save supported
+video/image results to Photos.
 
 ## Current state
 
 - The FastAPI sidecar, Docker packaging, Compose example, tests, and deployment/iOS
   documentation are implemented locally.
-- The sidecar is deployed on `diogoserver`, reachable through the dedicated
+- The sidecar is deployed on `server-1`, reachable through a dedicated
   Cloudflare Access-protected hostname, and passed a phone-to-Photos test.
-- Commit `13a6192` makes `POST /jobs` preserve the legacy MeTube `/add` option shape
-  used by the existing Shortcut. A local follow-up now fills omitted legacy fields
-  with the sidecar defaults.
+- Commit `99b510a` preserves the legacy MeTube `/add` option shape and fills omitted
+  request fields with the sidecar defaults.
 - The API supports job creation, polling, persistent metadata, stable-file detection,
   optional secondary API-key authentication, and attachment delivery.
 - Cloudflare credentials are not stored in the implementation.
-- The compatibility commit is available from the configured GitHub remote. The
-  default-value follow-up is not committed, pushed, or deployed.
+- The source is committed and synchronized with the configured upstream. The exact
+  revision deployed on `server-1` has not been recorded.
 
 ## Git state
 
-- Repository: `C:/Users/diogo/Documents/Projetos/metube-sidecar`
+- Repository: repository root
 - Branch: `main`
-- HEAD: `13a6192cc2a6e6a1b43189ca1bf949030977d9dd`
-- Upstream: `origin/main`; synchronized at `13a6192cc2a6e6a1b43189ca1bf949030977d9dd`
-- Remote: `origin` is `https://github.com/diogor0d/metube-sidecar.git`
-- Working tree: `app/main.py`, `tests/test_app.py`, `README.md`, and `HANDOFF.md`
-  contain the uncommitted default-value follow-up; nothing is staged
+- HEAD: `99b510ae7c53bc329cf96eb79ea9a8619e9e0b2d`
+- Upstream: `origin/main`; synchronized at the same commit
+- Working tree: `AGENTS.md` and `HANDOFF.md` contain the uncommitted public-disclosure
+  documentation update; nothing is staged
 
 ## Changes
 
@@ -47,6 +44,7 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 - `README.md`: architecture, Compose, Cloudflare Access, curl, iOS Shortcut, and
   security guidance.
 - `.dockerignore` and `.gitignore`: local, secret, cache, and runtime exclusions.
+- `HANDOFF.md`: public-safe continuity state using aliases and placeholders.
 
 ## Verification
 
@@ -59,9 +57,9 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 - Current upstream MeTube source review: the request schema accepts
   `download_type=video`, `codec=h264`, `format=ios`, `quality=best`, and nested
   `folder` values, and successful `/add` calls return `status=ok`.
-- Production verification before the compatibility/default changes: sidecar health,
-  public Cloudflare Service Auth, job creation, polling, MP4 retrieval, and iOS
-  Photos save passed. The changed image has not been built or deployed.
+- Production evidence: sidecar health, public Cloudflare Service Auth, job creation,
+  polling, MP4 retrieval, and iOS Photos save passed. The exact deployed source
+  revision remains unverified.
 
 ## Decisions and constraints
 
@@ -76,11 +74,18 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 - Sidecar metadata deliberately excludes the submitted source URL.
 - Do not commit, push, configure a remote, or change production without explicit
   user authorization.
+- Treat every tracked file and all reachable history as public. `HANDOFF.md` remains
+  tracked but must use aliases/placeholders and contain no sensitive information.
 
 ## Risks and blockers
 
-- The default-value follow-up still needs an authorized commit/push and a user-run
-  pull/rebuild on `diogoserver` before the old Shortcut selectors can be retested.
+- Specific resolution selections can cause MeTube rejection when display labels
+  such as `1080p` are sent instead of API values such as `1080`; the resulting
+  Cloudflare HTML error cannot be parsed as a Shortcut dictionary.
+- Thumbnail jobs can be accepted by MeTube but are not completed by the sidecar
+  because image extensions are not yet part of type-aware output detection.
+- Audio files are detectable by the sidecar but require a Shortcut **Save File**
+  branch rather than **Save to Photo Album**.
 - Current MeTube deduplicates a URL that is already queued or pending but still
   returns `status=ok`. A simultaneous duplicate sidecar submission would not get
   its requested job folder and would eventually time out; avoid that case until it
@@ -90,18 +95,19 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 
 ## Next actions
 
-1. Review the default-value follow-up, then commit and push only with explicit user
-   authorization.
-2. On `diogoserver`, pull the authorized commit and rebuild/recreate the sidecar.
-3. Restore the existing Shortcut's `quality`, `format`, and codec fields and perform
-   a phone-to-Photos regression test.
+1. Add type-aware thumbnail output detection and JSON validation/normalization for
+   resolution selections, with tests and synchronized documentation.
+2. Add separate Shortcut save branches for Photos-compatible media and audio/files.
+3. Record the deployed source revision during the next authorized rebuild and run
+   video, thumbnail, resolution, and audio regression tests.
 4. Decide whether simultaneous duplicate-URL submissions and download retention
    need additional handling.
 
 ## Resume instructions
 
 1. Check out `main` and obtain commit
-   `13a6192cc2a6e6a1b43189ca1bf949030977d9dd` from `origin/main`.
+   `99b510ae7c53bc329cf96eb79ea9a8619e9e0b2d` from `origin/main`, plus the
+   uncommitted documentation update described above.
 2. Read `AGENTS.md`, this file, `README.md`, `app/main.py`, and
    `docker-compose.example.yml` completely.
 3. Verify the branch, HEAD, remote/upstream, and working tree. Report discrepancies

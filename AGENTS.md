@@ -39,6 +39,25 @@ caller, primarily an iOS Shortcut that saves the result to Photos.
 - A file is complete only after temporary download files disappear and the selected
   output remains unchanged for `STABLE_SECONDS`.
 
+## Public repository disclosure
+
+- Treat this repository, every tracked file, all reachable Git history, issues,
+  pull requests, CI output, and release artifacts as public information.
+- `HANDOFF.md` may remain tracked for project continuity, but it is public and is
+  not an exception to the disclosure rules.
+- Never include real credentials or credential identifiers, Cloudflare client IDs
+  or secrets, service-token headers, authorization cookies, API keys, private keys,
+  `.env` contents, production data, or submitted/downloaded media.
+- Do not record exact production domains, public or private IP addresses, machine
+  hostnames, tunnel or account identifiers, usernames, personal absolute paths, or
+  secret-bearing configuration. Use logical aliases and placeholders instead.
+- Summarize operational evidence. Do not commit raw logs, screenshots, support
+  bundles, complete Compose renderings, container inspection output, or command
+  output that may contain sensitive infrastructure details.
+- Make test credentials obviously synthetic. Before any commit or push, inspect the
+  diff and perform a proportionate sensitive-information scan of all content that
+  would become reachable. Stop if a finding cannot be classified safely.
+
 ## Development workflow
 
 - Target Python 3.12 or newer.
@@ -69,4 +88,3 @@ caller, primarily an iOS Shortcut that saves the result to Photos.
   Shortcut's dedicated service token.
 - Never mutate a production deployment, Cloudflare configuration, Git history, or a
   remote repository without explicit authorization.
-
