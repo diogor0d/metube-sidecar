@@ -102,6 +102,29 @@ The response resembles:
 Poll the returned `poll_url`. When `status` becomes `complete`, request `file_url`
 with the same Cloudflare headers.
 
+### Existing MeTube Shortcut compatibility
+
+`POST /jobs` also accepts the legacy option shape used by Shortcuts that previously
+posted directly to MeTube's `/add` endpoint. When `quality`, `format`, or
+`video_codec` is supplied without `download_type`, the sidecar forwards those
+values using MeTube's legacy schema and adds only its controlled per-job folder.
+For example:
+
+```json
+{
+  "url": "https://example.com/video",
+  "quality": "best_ios",
+  "format": "mp4",
+  "video_codec": "h264"
+}
+```
+
+For compatibility with existing sidecar-oriented Shortcuts, `codec` in a
+legacy-shaped body is translated to MeTube's legacy `video_codec` field. Requests
+that explicitly provide `download_type` continue to use MeTube's current schema.
+URL-only requests continue to default to `format=ios`, `codec=h264`, and
+`quality=best`.
+
 ## iOS Shortcut flow
 
 Use the remote sidecar address as `server_address`, without a trailing slash.
@@ -111,7 +134,8 @@ Use the remote sidecar address as `server_address`, without a trailing slash.
    - Headers: `CF-Access-Client-Id`, `CF-Access-Client-Secret`,
      `Content-Type: application/json`
    - JSON body: `url` = the shared video URL. The defaults are `format=ios`,
-     `codec=h264`, and `quality=best`.
+     `codec=h264`, and `quality=best`. Existing direct-MeTube `quality`, `format`,
+     and `video_codec` selections can be retained unchanged.
 2. Get dictionary value `id` from the response and store it as `job_id`.
 3. Repeat up to 120 times:
    - Wait 5 seconds.

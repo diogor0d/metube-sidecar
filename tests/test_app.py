@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import httpx
@@ -77,6 +78,54 @@ def test_rejects_non_http_source_url(tmp_path: Path) -> None:
     assert response.status_code == 422
 
 
+def test_legacy_metube_options_are_forwarded_without_new_schema_fields(
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+    app = create_app(settings_for(tmp_path), accepting_transport(captured))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/jobs",
+            json={
+                "url": "https://example.com/video",
+                "quality": "best_ios",
+                "format": "mp4",
+                "codec": "h264",
+            },
+        )
+
+    assert response.status_code == 202
+    payload = json.loads(str(captured["json"]))
+    assert payload["quality"] == "best_ios"
+    assert payload["format"] == "mp4"
+    assert payload["video_codec"] == "h264"
+    assert "download_type" not in payload
+    assert "codec" not in payload
+    assert payload["folder"].startswith("sidecar/")
+
+
+def test_legacy_audio_format_is_left_for_metube_to_migrate(tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+    app = create_app(settings_for(tmp_path), accepting_transport(captured))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/jobs",
+            json={
+                "url": "https://example.com/video",
+                "quality": "best",
+                "format": "m4a",
+            },
+        )
+
+    assert response.status_code == 202
+    payload = json.loads(str(captured["json"]))
+    assert payload["quality"] == "best"
+    assert payload["format"] == "m4a"
+    assert "download_type" not in payload
+
+
 def test_optional_api_key_protects_job_routes(tmp_path: Path) -> None:
     app = create_app(
         settings_for(tmp_path, api_key="correct-horse-battery-staple"),
@@ -110,4 +159,3 @@ def test_temporary_file_keeps_job_downloading(tmp_path: Path) -> None:
         status_response = client.get(f"/jobs/{created['id']}")
 
     assert status_response.json()["status"] == "downloading"
-

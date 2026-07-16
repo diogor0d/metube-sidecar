@@ -80,6 +80,7 @@ class JobCreate(BaseModel):
     format: str = Field(default="ios", min_length=1, max_length=64)
     download_type: Literal["video", "audio"] = "video"
     codec: str = Field(default="h264", min_length=1, max_length=64)
+    video_codec: str | None = Field(default=None, min_length=1, max_length=64)
 
     @field_validator("url")
     @classmethod
@@ -156,6 +157,41 @@ def public_job(job: dict[str, Any]) -> JobResponse:
 
 def job_directory(settings: Settings, job_id: str) -> Path:
     return settings.downloads_dir / settings.job_subdir / job_id
+
+
+def metube_payload(
+    request: JobCreate,
+    settings: Settings,
+    job_id: str,
+) -> dict[str, str]:
+    supplied_fields = request.model_fields_set
+    folder = f"{settings.job_subdir}/{job_id}"
+
+    # MeTube's legacy /add schema infers download_type, codec, and output format
+    # from quality/format/video_codec. Preserve those semantics for existing
+    # Shortcuts that previously posted directly to MeTube. The job folder remains
+    # sidecar-controlled so the resulting file can be correlated safely.
+    legacy_fields = {"quality", "format", "video_codec"}
+    if "download_type" not in supplied_fields and supplied_fields & legacy_fields:
+        payload = {"url": request.url, "folder": folder}
+        for field in ("quality", "format", "video_codec"):
+            value = getattr(request, field)
+            if field in supplied_fields and value is not None:
+                payload[field] = value
+
+        # Accept the newer field name as a convenience for legacy-shaped bodies.
+        if "codec" in supplied_fields and "video_codec" not in payload:
+            payload["video_codec"] = request.codec
+        return payload
+
+    return {
+        "url": request.url,
+        "quality": request.quality,
+        "format": request.format,
+        "download_type": request.download_type,
+        "codec": request.codec,
+        "folder": folder,
+    }
 
 
 def is_temporary(path: Path) -> bool:
@@ -278,6 +314,7 @@ def create_app(
     )
     async def create_job(request: JobCreate) -> JobResponse:
         job_id = str(uuid4())
+        payload = metube_payload(request, active_settings, job_id)
         now = utc_now_iso()
         job: dict[str, Any] = {
             "id": job_id,
@@ -288,15 +325,6 @@ def create_app(
         }
         async with lock:
             store.save(job)
-
-        payload = {
-            "url": request.url,
-            "quality": request.quality,
-            "format": request.format,
-            "download_type": request.download_type,
-            "codec": request.codec,
-            "folder": f"{active_settings.job_subdir}/{job_id}",
-        }
 
         try:
             async with httpx.AsyncClient(

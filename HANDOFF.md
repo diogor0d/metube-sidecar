@@ -11,31 +11,35 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 
 - The FastAPI sidecar, Docker packaging, Compose example, tests, and deployment/iOS
   documentation are implemented locally.
-- The untracked implementation was reviewed on 2026-07-16. The single-video
-  request fields and success response match the current upstream MeTube API.
+- The sidecar is deployed on `diogoserver`, reachable through the dedicated
+  Cloudflare Access-protected hostname, and passed a phone-to-Photos test.
+- A local, uncommitted compatibility change makes `POST /jobs` preserve the legacy
+  MeTube `/add` option shape used by the existing Shortcut while retaining the
+  current URL-only defaults.
 - The API supports job creation, polling, persistent metadata, stable-file detection,
   optional secondary API-key authentication, and attachment delivery.
 - Cloudflare credentials are not stored in the implementation.
-- The intended GitHub remote still needs user confirmation. Deployment-specific
-  Compose values, the GitHub transfer, the Ubuntu image build, Cloudflare hostname
-  configuration, and the final iOS test remain.
+- The baseline implementation is committed and available from the configured
+  GitHub remote. The compatibility change is not committed, pushed, or deployed.
 
 ## Git state
 
 - Repository: `C:/Users/diogo/Documents/Projetos/metube-sidecar`
 - Branch: `main`
-- HEAD: `e3c1e67ac480dd5dc03cd60e8f1446424b0be96d`
-- Upstream: not configured; no Git remote was present when this handoff was prepared
-- Working tree: `.gitattributes` is tracked; the sidecar implementation,
-  `AGENTS.md`, and this `HANDOFF.md` are untracked
+- HEAD: `6397fb5d898fd535bcc279220cf890ee0d5f0677`
+- Upstream: `origin/main`; synchronized at `6397fb5d898fd535bcc279220cf890ee0d5f0677`
+- Remote: `origin` is `https://github.com/diogor0d/metube-sidecar.git`
+- Working tree: `app/main.py`, `tests/test_app.py`, `README.md`, and `HANDOFF.md`
+  are modified; nothing is staged
 
 ## Changes
 
 - `AGENTS.md`: durable architecture, security, development, and deployment rules.
 - `app/main.py`: FastAPI job API, JSON state store, internal MeTube client, download
-  detection, optional API key, and safe file response.
-- `tests/test_app.py`: job lifecycle, URL validation, API-key, and temporary-file
-  tests.
+  detection, optional API key, safe file response, and legacy MeTube option
+  forwarding.
+- `tests/test_app.py`: job lifecycle, URL validation, API-key, temporary-file, and
+  legacy request compatibility tests.
 - `Dockerfile`: unprivileged Python 3.12 application image.
 - `docker-compose.example.yml`: internal-only sidecar service, read-only downloads,
   persistent metadata volume, and shared-network example.
@@ -46,7 +50,8 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 
 ## Verification
 
-- `python -m pytest -q`: passed on 2026-07-16, 4 tests.
+- `python -m pytest -q`: passed after the compatibility change on 2026-07-16,
+  6 tests.
 - `python -m compileall -q app tests`: passed on 2026-07-16.
 - `docker compose -f docker-compose.example.yml config --quiet`: passed on
   2026-07-16.
@@ -55,8 +60,9 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 - Current upstream MeTube source review: the request schema accepts
   `download_type=video`, `codec=h264`, `format=ios`, `quality=best`, and nested
   `folder` values, and successful `/add` calls return `status=ok`.
-- Container image build: not run because the Docker Desktop Linux daemon was not
-  running on the Windows resume machine.
+- Production verification before the compatibility change: sidecar health, public
+  Cloudflare Service Auth, job creation, polling, MP4 retrieval, and iOS Photos save
+  passed. The changed image has not been built or deployed.
 
 ## Decisions and constraints
 
@@ -74,14 +80,8 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 
 ## Risks and blockers
 
-- No Git remote or upstream is configured, and all implementation files are
-  untracked. They cannot reach another Codex project through Git until the user
-  authorizes a commit, configures the intended remote, and pushes.
-- The Compose download path is a placeholder until reconciled with the existing
-  MeTube deployment on the Ubuntu server.
-- The container image has not yet been built or exercised against the user's actual
-  MeTube version, configuration, and filesystem permissions. Compatibility with
-  upstream MeTube does not establish compatibility with the deployed version.
+- The compatibility change still needs an authorized commit/push and a user-run
+  pull/rebuild on `diogoserver` before the old Shortcut selectors can be retested.
 - Current MeTube deduplicates a URL that is already queued or pending but still
   returns `status=ok`. A simultaneous duplicate sidecar submission would not get
   its requested job folder and would eventually time out; avoid that case until it
@@ -91,27 +91,18 @@ Service Auth-protected Tunnel hostname, and a successful phone-to-gallery test.
 
 ## Next actions
 
-1. Confirm the intended GitHub remote.
-2. Decide whether simultaneous duplicate-URL submissions must be handled before the
-   first deployment.
-3. With explicit authorization, add the remote if needed, commit the files, and push
-   `main` so the repository-backed Codex project can obtain them.
-4. On Ubuntu, reconcile `docker-compose.example.yml` with the existing MeTube
-   service name, Docker network, and exact host download path.
-5. Build and start the sidecar; verify `/healthz`, a submitted job, polling, and file
-   retrieval over the internal network.
-6. Add the dedicated Cloudflare Tunnel hostname and an Access **Service Auth** policy
-   for the Shortcut's dedicated service token.
-7. Update the iOS Shortcut to create a job, poll it, fetch `file_url` with the same
-   Access headers, and pass the returned file to **Save to Photo Album**.
-8. Perform one end-to-end test, then decide on download retention and cleanup.
+1. Review the compatibility diff, then commit and push only with explicit user
+   authorization.
+2. On `diogoserver`, pull the authorized commit and rebuild/recreate the sidecar.
+3. Restore the existing Shortcut's `quality`, `format`, and codec fields and perform
+   a phone-to-Photos regression test.
+4. Decide whether simultaneous duplicate-URL submissions and download retention
+   need additional handling.
 
 ## Resume instructions
 
 1. Check out `main` and obtain commit
-   `e3c1e67ac480dd5dc03cd60e8f1446424b0be96d` plus the implementation changes. The
-   changes described here were untracked when prepared and will not transfer unless
-   they are committed and pushed or copied by another approved method.
+   `6397fb5d898fd535bcc279220cf890ee0d5f0677` from `origin/main`.
 2. Read `AGENTS.md`, this file, `README.md`, `app/main.py`, and
    `docker-compose.example.yml` completely.
 3. Verify the branch, HEAD, remote/upstream, and working tree. Report discrepancies
