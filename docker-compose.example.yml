@@ -1,0 +1,29 @@
+services:
+  metube-sidecar:
+    build: .
+    container_name: metube-sidecar
+    restart: unless-stopped
+    environment:
+      METUBE_URL: http://metube:8081
+      DOWNLOADS_DIR: /downloads
+      DATA_DIR: /data
+      JOB_SUBDIR: sidecar
+      STABLE_SECONDS: 5
+      JOB_TIMEOUT_SECONDS: 3600
+      # Optional defense in depth. Cloudflare Access remains the primary control.
+      # SIDECAR_API_KEY: replace-with-a-long-random-value
+    volumes:
+      # Use the exact same host download directory mounted into MeTube.
+      - /path/to/metube/downloads:/downloads:ro
+      - sidecar-data:/data
+    expose:
+      - "8080"
+    networks:
+      - metube
+
+networks:
+  metube:
+    external: true
+
+volumes:
+  sidecar-data:
