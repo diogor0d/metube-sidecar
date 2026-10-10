@@ -240,6 +240,37 @@ The response resembles:
 Poll `poll_url` until `status` becomes `complete`, then request `file_url`
 with the same Cloudflare headers.
 
+### Caller correlation and uncertain submissions
+
+`POST /jobs` optionally accepts `request_id`, a caller-generated canonical UUID.
+Persist that ID before submitting. Repeated requests with the same ID return the
+latest job record and never create another MeTube `/add` request, including
+while the first request is in flight or after completion. Existing callers may
+omit this field and keep the previous random-ID behavior.
+
+`submission_unknown: true` means the upstream response did not establish whether
+MeTube accepted the request. Poll `/jobs/{request_id}`; do not create another job
+or blindly retry upstream submission. A stable supported output in that job's
+UUID directory confirms completion; an empty directory does not establish
+acceptance. Unconfirmed submissions become a visible failure after the existing
+job timeout. Source URLs remain absent from persisted job metadata.
+
+Media Manager can use this API as another entry point through a fixed internal
+sidecar origin. It imports a private copy, so its history deletion and expiry do
+not delete MeTube originals. The existing MeTube interface, sidecar routes, and
+Shortcut option shapes remain available. This addition was validated with
+disposable synthetic MeTube downloads; installed-device and production acceptance
+remain separate gates.
+
+### Private Media Manager bridge
+
+Set `SIDECAR_BRIDGE_API_KEY` only in protected runtime configuration. The additive
+`/internal/jobs`, `/internal/jobs/{job_id}`, and `/internal/jobs/{job_id}/download`
+routes require `X-Sidecar-Bridge-Key`; they return 404 when the bridge is disabled.
+Media Manager keeps the same key in `MEDIA_MANAGER_METUBE_SIDECAR_API_KEY`.
+Existing `/jobs` clients and optional `SIDECAR_API_KEY` behavior remain unchanged.
+
+
 <details>
 <summary><strong>Compatibility with Shortcuts that posted directly to MeTube</strong></summary>
 
