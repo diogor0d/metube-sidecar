@@ -1,0 +1,58 @@
+# Disposable synthetic test stack. Never use this as a production configuration.
+services:
+  fixture:
+    image: ${METUBE_TEST_IMAGE:?Run scripts/integration.sh}
+    entrypoint: ["python", "-m", "http.server", "8082", "--directory", "/fixtures"]
+    volumes:
+      - ./shortcuts/tests/fixtures:/fixtures:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    cpus: 0.15
+  metube:
+    image: ghcr.io/alexta69/metube@sha256:8e2fe9beeefc55a02f6e1d04cad0fc3c22e8f067d309188f016551dc99ec27b3
+    environment:
+      MAX_CONCURRENT_DOWNLOADS: "1"
+      LOGLEVEL: WARNING
+      # Only this isolated test stack may fetch its generated internal fixture.
+      ALLOW_PRIVATE_ADDRESSES: "true"
+    volumes:
+      - downloads:/downloads
+    mem_limit: 512m
+    cpus: 0.5
+  sidecar:
+    build: .
+    image: ${METUBE_TEST_IMAGE:?Run scripts/integration.sh}
+    environment:
+      METUBE_URL: http://metube:8081
+      DOWNLOADS_DIR: /downloads
+      DATA_DIR: /data
+      STABLE_SECONDS: "1"
+      JOB_TIMEOUT_SECONDS: "60"
+      SIDECAR_API_KEY: synthetic-local-integration-key
+    volumes:
+      - downloads:/downloads:ro
+      - data:/data
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.25
+  check:
+    image: ${METUBE_TEST_IMAGE:?Run scripts/integration.sh}
+    entrypoint: ["python", "/integration/check.py"]
+    volumes:
+      - ./scripts/integration-check.py:/integration/check.py:ro
+      - ./shortcuts/tests/fixtures:/fixtures:ro
+      - data:/state:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.25
+networks:
+  default:
+    internal: true
+volumes:
+  downloads:
+  data:

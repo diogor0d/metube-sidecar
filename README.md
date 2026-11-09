@@ -70,6 +70,12 @@ holding the right token: a private, self-hosted answer to the shady
 
 ## What it does
 
+Development and production validation are recorded in the
+[2026-10-06 history](docs/history/2026-10-06-shortcut-production-validation.md).
+See the [Shortcut testing guidelines](shortcuts/testing-guidelines.md) and
+[installed test-copy cleanup](shortcuts/testing-cleanup.md) for repeatable checks
+and the archive status.
+
 The sidecar wraps MeTube's internal `/add` endpoint in a small job API:
 
 - **Submit** a URL and get a job ID back immediately (`202 Accepted`).
@@ -270,7 +276,6 @@ routes require `X-Sidecar-Bridge-Key`; they return 404 when the bridge is disabl
 Media Manager keeps the same key in `MEDIA_MANAGER_METUBE_SIDECAR_API_KEY`.
 Existing `/jobs` clients and optional `SIDECAR_API_KEY` behavior remain unchanged.
 
-
 <details>
 <summary><strong>Compatibility with Shortcuts that posted directly to MeTube</strong></summary>
 
@@ -293,11 +298,20 @@ For compatibility with existing sidecar-oriented Shortcuts, `codec` in a
 legacy-shaped body is translated to MeTube's legacy `video_codec` field.
 Requests that explicitly provide `download_type` continue to use MeTube's
 current schema. Omitted legacy fields and URL-only requests default to
-`format=ios`, `codec=h264`, and `quality=best`.
+`format=ios`, `codec=h264`, and `quality=best`. MeTube's iOS preset permits both
+H.264 and HEVC; it does not guarantee H.264-only output even with that codec
+preference. The deployed image's selector was verified against its source and a
+live HEVC/AAC MP4 on 2026-10-06.
 
 </details>
 
 ## iOS Shortcut flow
+
+The maintained native Shortcut source, reproducible build, private Mac runner,
+and native test harness are in [`shortcuts/`](shortcuts/README.md). It offers
+Video, Image (JPEG thumbnail), and GIF (trim a downloaded video locally), then
+Save to Photos, Save to Files, Share, or Discard. Public builds contain no
+configured hostname or authentication values.
 
 Use the remote sidecar address as `server_address`, without a trailing slash.
 
@@ -318,6 +332,15 @@ Use the remote sidecar address as `server_address`, without a trailing slash.
      and stop the Shortcut.
    - If `status` is `failed`, show `error` and stop the Shortcut.
 4. If the loop finishes, show a timeout notification.
+
+For an image, submit `download_type=thumbnail`, `format=jpg`, `codec=auto`,
+and `quality=best`. Video resolution labels such as `1080p` are normalized to
+the MeTube API value `1080`; existing quality aliases remain supported. New
+job metadata records the requested media type, so image sidecars cannot be
+mistaken for video/audio output. Older persisted jobs remain readable.
+
+Audio callers can submit `download_type=audio` with an audio format and save the
+result to Files. The maintained Video/Image/GIF Shortcut does not offer audio.
 
 > [!TIP]
 > Every HTTP action needs the Cloudflare headers — authentication is not
@@ -349,14 +372,36 @@ or cleanup policy to MeTube's `sidecar/` directory.
 Requires Python 3.12+.
 
 ```bash
-python -m pip install -e ".[dev]"
-python -m pytest -q
-docker compose -f docker-compose.example.yml config --quiet
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
+sh scripts/check.sh
 ```
+
+What it does: creates the development environment, installs the project and
+test tools, rebuilds the Shortcut, and checks Python tests, Compose, and whitespace.
+Set `CHERRI_BIN` to the pinned compiler if it is not at `shortcuts/.tools/cherri`.
 
 Tests cover API behavior, persistence, authentication, path safety, and
 download detection. When changing the API, keep the tests, this README, and
 the Compose example synchronized.
+
+To exercise the real MeTube/yt-dlp pipeline with generated media:
+
+```bash
+sh scripts/integration.sh
+```
+
+What it does: builds a temporary sidecar image, starts a uniquely named isolated
+Docker stack, checks video, JPEG thumbnail, and `1080p` resolution jobs against a
+pinned official MeTube image, verifies exact fixture hashes and persisted metadata,
+and removes its own containers, network, volumes, and image tag. It requires Docker
+Compose and may download public images/packages. The stack publishes no host ports,
+uses synthetic authentication, and limits container resources.
+
+`docker-compose.integration.yml` permits private addresses only so its MeTube
+container can fetch the generated fixture on its internal network. Keep that
+test-only configuration separate from production. This integration check does
+not prove Cloudflare authentication, native Shortcut execution, or iOS Photos save.
 
 ## Acknowledgements
 

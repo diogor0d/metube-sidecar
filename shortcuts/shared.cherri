@@ -1,0 +1,10 @@
+#include 'actions/documents'
+#include 'actions/images'
+#include 'actions/media'
+#include 'actions/photos'
+#include 'actions/sharing'
+#include 'actions/text'
+#include 'actions/web'
+
+// Native alias used to make every handled terminal path visibly release data.
+action 'nothing' cleanup()

@@ -1,116 +1,216 @@
 # Handoff
 
+Updated: 2026-10-06. Production API and operator confirmation: 2026-10-06.
+
 ## Objective
 
-Operate a secure MeTube sidecar behind Cloudflare Access so an iOS Shortcut can
-submit media, poll for completion, retrieve the resulting file, and save supported
-video/image results to Photos.
+Make the native iOS Shortcut submit a MeTube job, poll it, retrieve the correct
+media, and save the result. Automate repeatable development and Mac testing
+without interfering with the user's active desktop work.
 
-## Current state
+## Repository state
 
-- The FastAPI sidecar, Docker packaging, Compose example, tests, and deployment/iOS
-  documentation are implemented locally.
-- The sidecar is deployed on `server-1`, reachable through a dedicated
-  Cloudflare Access-protected hostname, and passed a phone-to-Photos test.
-- Commit `99b510a` preserves the legacy MeTube `/add` option shape and fills omitted
-  request fields with the sidecar defaults.
-- The API supports job creation, polling, persistent metadata, stable-file detection,
-  optional secondary API-key authentication, and attachment delivery.
-- Cloudflare credentials are not stored in the implementation.
-- The source is committed and synchronized with the configured upstream. The exact
-  revision deployed on `server-1` has not been recorded.
+- Branch: `main`; HEAD: `d289a01d9bc77c294931804243747074200fe3fb`.
+- The checkout was clean before this session and locally synchronized with the
+  cached upstream reference. No fetch, pull, commit, push, or branch switch occurred.
+- The changes described below are uncommitted. Git and the current working tree
+  remain authoritative; this handoff does not imply another machine has them.
+- Earlier migration notes were superseded by authorized production inspection
+  and service-scoped upgrades on 2026-10-06. Images, API schema and video/JPEG
+  delivery were verified; see the deployment reviews and dated history.
+- The operator confirmed the Shortcut works on 2026-10-06. The confirmation did
+  not identify the device, mode or destination; retain specific acceptance limits.
 
-## Git state
+## Implemented locally
 
-- Repository: repository root
-- Branch: `main`
-- HEAD: `99b510ae7c53bc329cf96eb79ea9a8619e9e0b2d`
-- Upstream: `origin/main`; synchronized at the same commit
-- Working tree: `AGENTS.md` and `HANDOFF.md` contain the uncommitted public-disclosure
-  documentation update; nothing is staged
+- Imported the staged Cherri Shortcut source and existing structural/runner tests
+  into `shortcuts/`, excluding its private configuration and downloaded compiler.
+- Added a reproducible Mac build script using pinned Cherri 2.3.0 source revision
+  `d2072c62ea708e7727099fab94fa28b0bcec747b`. Compile with `--skip-sign`, then
+  finalize before Apple signing. Do not use Cherri's `--derive-uuids` flag.
+- Fixed Get URLs input serialization: its text parameter uses a text token string
+  containing an `ExtensionInput` attachment without `VariableName`. Native direct
+  video/image tests returned no URL with the old bare attachment and passed after
+  this repair. Address transformation inputs now use text token strings too.
+- Kept the private preparation scripts compatible with the system Python 3.9;
+  the application and native harness use Python 3.12+.
+- Updated the runner/Shortcut build marker to `2026.10.06.4`. After D00 on direct
+  launch, an implicit URL no-input policy was attempted in build .3. The user
+  subsequently reported D05 and no visible prompt when tapping. Build .4 removes
+  reliance on that policy, preserves direct URL extraction, adds the Get Text
+  conversion proven by native adapters as a fallback, then explicitly asks for a
+  URL if extraction remains empty. Its version-labelled prompt, cancellation and
+  real Share Sheet input still require native/device acceptance.
+- Added thumbnail requests and type-aware output discovery to the sidecar. New
+  metadata records the requested media type; old records retain their previous
+  video/audio fallback. Submitted source URLs remain absent from metadata.
+- Normalize numeric resolution labels such as `1080p` to `1080`; preserve aliases.
+- Reset file stability observations when temporary output appears.
+- Added `scripts/check.sh`, packaging configuration, and ignores that exclude
+  private Shortcut artifacts and compiler binaries from Git and Docker context.
+- Added a loopback native harness using the real sidecar with an in-process MeTube
+  mock, synthetic authentication, and synthetic video/image fixtures. Test copies
+  select their media type automatically and return the file instead of saving it.
+- Added a bounded native runner: it requires fresh evidence, respects the shared
+  Shortcuts UI lock, runs both already-imported drivers, checks hashes and request
+  lifecycles, and cancels only its own CLI subprocess when a dialog stalls.
+- A native preflight requires both Video/Image test and driver pairs in the
+  installed list. All four signed synthetic copies were registered in a
+  coordinated session. Duplicate-name imports required an explicit Replace
+  confirmation; older test copies were retained with numbered names.
+- Disposable native test copies return fixed failure stage/title receipts instead
+  of showing blocking alerts. An optional direct CLI adapter explicitly extracts
+  text from its input file before the existing URL extraction action. This
+  diagnoses the workflow separately from the unverified nested driver; it does
+  not prove actual Share Sheet input or destination actions.
+- Added a disposable Docker integration stack using a digest-pinned official
+  MeTube image and a generated HTML/media publisher. It tests the real MeTube and
+  yt-dlp pipeline without real credentials, external source sites, or host ports.
 
-## Changes
+## Verification and limits
 
-- `AGENTS.md`: durable architecture, security, development, and deployment rules.
-- `app/main.py`: FastAPI job API, JSON state store, internal MeTube client, download
-  detection, optional API key, safe file response, and legacy MeTube option
-  forwarding.
-- `tests/test_app.py`: job lifecycle, URL validation, API-key, temporary-file, and
-  legacy request compatibility tests.
-- `Dockerfile`: unprivileged Python 3.12 application image.
-- `docker-compose.example.yml`: internal-only sidecar service, read-only downloads,
-  persistent metadata volume, and shared-network example.
-- `pyproject.toml`: Python package and test dependencies.
-- `README.md`: architecture, Compose, Cloudflare Access, curl, iOS Shortcut, and
-  security guidance.
-- `.dockerignore` and `.gitignore`: local, secret, cache, and runtime exclusions.
-- `HANDOFF.md`: public-safe continuity state using aliases and placeholders.
+- Backend regression suite: 13 tests passed.
+- Shortcut structure, private runner, and harness checks: 55 tests passed on
+  2026-10-06. Together with the 13 backend tests, the required check script passed
+  all 68 checks. Mocked subprocess checks do not establish native execution.
+- Python compilation, Compose configuration, and whitespace validation passed.
+- The Docker image built; an unprivileged health check and mocked thumbnail
+  create/poll/file lifecycle passed inside the image.
+- Real local MeTube integration passed video, JPEG thumbnail, and numeric
+  resolution-label jobs, with returned bytes matching the generated fixtures.
+  An initial resolution case had unknown height metadata; supplying the clip's
+  actual height in the test page fixed the fixture, without changing API behavior.
+- `sh scripts/integration.sh` passed all three real MeTube cases, including job
+  metadata type and source-URL exclusion. Its temporary Docker resources were
+  removed and cleanup was checked. This proves the local backend pipeline only.
+- Apple signed the credential-free candidate. Signing proves neither execution
+  nor device acceptance.
+- The original configured Shortcut was privately backed up and preserved.
+- The nested Text-to-Run-Shortcut driver remains unverified. A fresh Video
+  driver timed out after 45 seconds with zero submit/poll/file requests. One
+  editor run also stalled at Run Shortcut and was explicitly stopped. The native
+  editor showed the expected target name and DriverURL input; this does not prove
+  the generated workflow reference resolves at runtime. No new run should start
+  until the prior run is stopped and any dialog is cleared.
+- Subsequent direct CLI Video and Image adapter runs passed on 2026-10-06 after
+  Get URLs was repaired to use its text-token input type. Native execution
+  submitted, polled, and retrieved both outputs; the MP4 and JPEG matched the
+  fixtures byte for byte. Each media type recorded one submit, two polls, and
+  one file request. This proves the local native API round trip, using the real
+  sidecar with mocked MeTube, but not the original Share Sheet/destination graph.
+- Earlier helper permission dialogs could not be reliably controlled. Looking
+  up the helper XPC as an application caused system open-document errors; do not
+  repeat that path. Coordinate exclusive UI ownership with other Shortcut chats.
+- Generic text-file CLI input did not exercise native URL extraction. The
+  Text-to-Run-Shortcut driver is itself unverified; diagnose its native binding or
+  use an explicit test-only text-input adapter before treating it as a test path.
+- The harness excludes mode/destination pickers, Photos/Files/Share/Discard,
+  GIF trimming/conversion, real MeTube, and actual iPhone Share Sheet behavior.
+  See `shortcuts/tests/on-device.md`; none of those acceptance boxes passed here.
 
-## Verification
+## Remaining acceptance and next actions
 
-- `python -m pytest -q`: passed after the compatibility/default change on
-  2026-07-16, 7 tests.
-- `python -m compileall -q app tests`: passed on 2026-07-16.
-- `docker compose -f docker-compose.example.yml config --quiet`: passed on
-  2026-07-16.
-- `git diff --check`: passed on 2026-07-16.
-- Current upstream MeTube source review: the request schema accepts
-  `download_type=video`, `codec=h264`, `format=ios`, `quality=best`, and nested
-  `folder` values, and successful `/add` calls return `status=ok`.
-- Production evidence: sidecar health, public Cloudflare Service Auth, job creation,
-  polling, MP4 retrieval, and iOS Photos save passed. The exact deployed source
-  revision remains unverified.
+1. Endpoint credential transmission was explicitly authorized on 2026-10-06.
+   Live health/schema checks passed, one disposable video job completed and
+   returned valid MP4 bytes, and unauthenticated health access was denied.
+   Before the upgrade, the deployed API rejected thumbnails with HTTP 422.
+   The reviewed upgrade in `deployment/thumbnail-upgrade.md` is now deployed;
+   live video and JPEG checks passed.
+2. Coordinate exclusive Shortcuts UI use with other active chats. Direct native
+   Video/Image adapters already passed; the nested driver and original address
+   graph remain unverified. A bounded zero-network configuration probe timed out
+   without a visible alert. Do not infer a dialog from a timeout. Organize only
+   this workflow's temporary copies, preserving the original configured shortcut.
+3. The final build adds explicit empty-selection/trim exits and GIF failure
+   handling. Its blank signed artifact and private configured unsigned copy are
+   prepared; the configured copy was signed by Apple with explicit user approval
+   and is stored with its previous backup in ignored `shortcuts/private/production/`.
+   Production inspection
+   and the service-scoped upgrade were explicitly approved and completed. The
+   exact image is deployed with rollback retained, and live MP4/JPEG checks pass.
+   The exact AMD64 candidate image passed non-root health/authentication/thumbnail
+   checks and all three isolated real-MeTube integration cases; cleanup passed.
+4. Complete signed iPhone/iPad Share Sheet, GIF, destination, cancellation, and
+   Photos acceptance before marking the goal complete.
 
-## Decisions and constraints
+## MeTube extractor repair verified on 2026-10-06
 
-- Cloudflare Access service-token credentials remain only with the caller and must
-  be sent on every Shortcut HTTP action.
-- The sidecar calls MeTube over the private Docker network; it does not call MeTube
-  through Cloudflare.
-- MeTube's download directory is mounted read-only into the sidecar.
-- Each job uses `sidecar/<UUID>` to correlate output without trusting a remote title
-  or guessing a filename.
-- The default output request is `format=ios`, `codec=h264`, and `quality=best`.
-- Sidecar metadata deliberately excludes the submitted source URL.
-- Do not commit, push, configure a remote, or change production without explicit
-  user authorization.
-- Treat every tracked file and all reachable history as public. `HANDOFF.md` remains
-  tracked but must use aliases/placeholders and contain no sensitive information.
+- A user-observed TikTok failure reached MeTube and failed during extraction;
+  the deployed yt-dlp version was `2026.07.04`. This was separate from the
+  Shortcut's earlier input-prompt defects.
+- The separately authorized MeTube-only upgrade selected official release
+  `2026.09.29` with yt-dlp `2026.08.19`. The exact AMD64 image passed local
+  extraction and all three isolated integration cases before deployment.
+- The original image, Compose configuration and two-file state/history archive
+  were retained privately. Archive contents were read back before changing the
+  service. The idle queue, all 14 history entries and original storage/network/
+  port/restart/user boundaries were verified; the sidecar was not recreated.
+- Fresh production jobs for the previously failing user link completed and
+  returned valid MP4 video and JPEG thumbnail responses. Failed history does not
+  itself require deletion or a UI retry; submit a fresh sidecar job.
+- Independent media probing found HEVC/AAC in that MP4. Exact-image source
+  inspection confirmed the request mapping is correct and MeTube's `ios` preset
+  intentionally accepts both H.264 and HEVC. A legacy request returned the same
+  bytes. Corrected the overly strict H.264-only documentation; no code fix or
+  subsequent sidecar mutation was needed.
+- See `deployment/metube-tiktok-upgrade.md` for the pinned image and rollback.
+  Final native GIF, destinations and iPhone acceptance remain pending. This
+  backend repair does not require another Shortcut import.
+- The user asked about progress feedback. Existing status supports coarse stage
+  notifications without API changes; percentage/ETA require measured MeTube
+  progress integration. Avoid a notification per poll or fabricated percentages.
+  No Shortcut graph change was made for this request yet.
 
-## Risks and blockers
+## Constraints
 
-- Specific resolution selections can cause MeTube rejection when display labels
-  such as `1080p` are sent instead of API values such as `1080`; the resulting
-  Cloudflare HTML error cannot be parsed as a Shortcut dictionary.
-- Thumbnail jobs can be accepted by MeTube but are not completed by the sidecar
-  because image extensions are not yet part of type-aware output detection.
-- Audio files are detectable by the sidecar but require a Shortcut **Save File**
-  branch rather than **Save to Photo Album**.
-- Current MeTube deduplicates a URL that is already queued or pending but still
-  returns `status=ok`. A simultaneous duplicate sidecar submission would not get
-  its requested job folder and would eventually time out; avoid that case until it
-  is handled and tested.
-- Completion detection uses filesystem stability rather than a MeTube completion
-  event; tune `STABLE_SECONDS` if the deployment filesystem behaves differently.
+- Keep this public handoff free of real endpoints, credential identifiers,
+  private paths, production data, and raw operational evidence.
+- Keep the downloads mount read-only, container port internal, path containment
+  checks intact, and Uvicorn at one worker.
+- MeTube may accept a duplicate queued URL without creating the second job's
+  requested folder. Concurrent duplicate submission remains an existing limitation.
+- Saving or discarding in the Shortcut does not delete server output. Retention
+  remains the operator's responsibility.
+- Preserve unrelated user changes. Reconcile this checkout and any staged copy
+  before editing; never assume uncommitted changes transferred between machines.
 
-## Next actions
+## Durable records and cleanup on 2026-10-06
 
-1. Add type-aware thumbnail output detection and JSON validation/normalization for
-   resolution selections, with tests and synchronized documentation.
-2. Add separate Shortcut save branches for Photos-compatible media and audio/files.
-3. Record the deployed source revision during the next authorized rebuild and run
-   video, thumbnail, resolution, and audio regression tests.
-4. Decide whether simultaneous duplicate-URL submissions and download retention
-   need additional handling.
+- Full record: `docs/history/2026-10-06-shortcut-production-validation.md`.
+- Lessons: `shortcuts/testing-guidelines.md`; Media Manager owns its broader guide.
+- Installed test-copy cleanup: `shortcuts/testing-cleanup.md`. A later fresh global
+  inventory confirms all 24 obsolete candidates are absent, with exactly one
+  MeTube production copy and both Media Manager products retained. Earlier native
+  scripting deletion only removed folder membership; it did not delete workflows.
+  Preserve source fixtures, private originals and deployment rollback checkpoints.
 
-## Resume instructions
+## Quiet production update on 2026-10-06
 
-1. Check out `main` and obtain commit
-   `99b510ae7c53bc329cf96eb79ea9a8619e9e0b2d` from `origin/main`, plus the
-   uncommitted documentation update described above.
-2. Read `AGENTS.md`, this file, `README.md`, `app/main.py`, and
-   `docker-compose.example.yml` completely.
-3. Verify the branch, HEAD, remote/upstream, and working tree. Report discrepancies
-   before editing.
-4. Re-run the verification commands in `AGENTS.md`, then continue with the smallest
-   unfinished action in **Next actions**.
+- At the operator's request, build `2026.10.06.5` removes all diagnostic
+  notifications, Debug choices, stage codes and the build-labelled URL prompt.
+  Normal Video/Image/GIF and destination choices, plain errors, validation,
+  authenticated API calls and local GIF conversion remain. No backend mutation.
+- The required check script passed 68 tests, compilation, Compose validation
+  and whitespace checks. Both blank and private configured copies were signed;
+  configured Apple signing follows the operator's explicit prior approval.
+- Media Manager owns supported native GUI replacement for both projects.
+  Replace the existing product instead of adding another numbered copy.
+  Installation verification is separate from the artifact audit.
+
+- Supported Add/Replace installed the quiet MeTube product; its editor has the
+  plain URL prompt and exactly Video/Image/GIF choices. Replacement also retained
+  three superseded originals across the projects with numbered suffixes. Media
+  Manager batches their deletion after the native tool's required fresh
+  action-time confirmation. Do not equate the earlier 24-copy cleanup checkpoint
+  with absence of these subsequently created replacement originals.
+
+## Final duplicate cleanup, 2026-10-06
+
+The operator confirmed deletion of superseded installed copies. Media Manager
+used supported native Delete for only MeTube Download Configured 2, Compress
+Media 2 and Convert Media 2. Two independent fresh global checks verified all
+three old identifiers absent, all three quiet products retained, exactly one
+entry per workflow and 44 library entries total. Supported UI agreed. No new
+test copies or media runs were created. The earlier pending deletion checkpoint
+is resolved. Future replacement/testing cleanup must finish with global absence
+verification, not archive assignment or a successful command return value.

@@ -1,0 +1,190 @@
+#define name MeTube Download
+#define color darkorange
+#define glyph downloadArrow
+#define inputs url, text, webpage, article, richtext, file, image, media
+#define outputs file, image, media
+#define from sharesheet
+#define mac false
+#define version 18
+
+#include 'shared.cherri'
+
+#question server_address "HTTPS sidecar address" ""
+#question cf_client_id "Cloudflare Access client ID" ""
+#question cf_client_secret "Cloudflare Access client secret" ""
+#question sidecar_api_key "Optional sidecar API key (leave blank if disabled)" ""
+
+const serverAddress = text(server_address)
+const clientID = text(cf_client_id)
+const clientSecret = text(cf_client_secret)
+const sidecarAPIKey = text(sidecar_api_key)
+
+const normalizedServerAddress = replaceText('/+$', "", "{serverAddress}", true, true)
+const serverMatch = matchText('^https://(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$', "{normalizedServerAddress}", true)
+if !serverMatch {
+    alert("Set an HTTPS origin without credentials, a path, query, or fragment.", "Invalid sidecar address")
+    cleanup()
+    stop()
+}
+
+if !clientID || !clientSecret {
+    alert("Both Cloudflare Access service-token values are required.", "Missing configuration")
+    cleanup()
+    stop()
+}
+
+@inputURLs = getURLs(ShortcutInput)
+if !@inputURLs {
+    const inputText = getText(ShortcutInput)
+    @inputURLs = getURLs(inputText)
+}
+if !@inputURLs {
+    const enteredURL = prompt("Paste media URL", "Text", "", "false")
+    @inputURLs = getURLs(enteredURL)
+}
+if !@inputURLs {
+    alert("No usable URL was found or pasted. Paste a media page or direct download URL.", "No usable URL")
+    cleanup()
+    stop()
+}
+const sourceURL = getFirstItem(@inputURLs)
+
+@mediaKind = "Video"
+@downloadType = "video"
+@mediaFormat = "ios"
+@codec = "h264"
+
+const modeOptions = list("Video", "Image", "GIF")
+const modeChoice = chooseFromList(modeOptions, "Choose output")
+if !modeChoice {
+    cleanup()
+    stop()
+}
+@modeText = "{modeChoice}"
+if @modeText == "Image" {
+    @mediaKind = "Image"
+    @downloadType = "thumbnail"
+    @mediaFormat = "jpg"
+    @codec = "auto"
+}
+if @modeText == "GIF" {
+    @mediaKind = "GIF"
+}
+
+const createRaw = jsonRequest("{normalizedServerAddress}/jobs", "POST", {
+    "url": "{sourceURL}",
+    "quality": "best",
+    "format": "{@mediaFormat}",
+    "download_type": "{@downloadType}",
+    "codec": "{@codec}"
+}, {
+    "CF-Access-Client-Id": "{clientID}",
+    "CF-Access-Client-Secret": "{clientSecret}",
+    "X-Sidecar-Api-Key": "{sidecarAPIKey}",
+    "Content-Type": "application/json"
+})
+const createResponse = getDictionary(createRaw)
+@jobID = "{createResponse['id']}"
+@expectedPollPath = "/jobs/{@jobID}"
+@pollPath = "{createResponse['poll_url']}"
+
+if !@jobID || @pollPath != @expectedPollPath {
+    alert("The sidecar rejected the job or returned an unexpected poll path.", "Download not accepted")
+    cleanup()
+    stop()
+}
+
+@complete = "no"
+@downloadedFile = nil
+
+repeat attempt for 120 {
+    if @complete == "no" {
+        wait(5)
+        const pollRaw = downloadURL("{normalizedServerAddress}{@expectedPollPath}", {
+            "CF-Access-Client-Id": "{clientID}",
+            "CF-Access-Client-Secret": "{clientSecret}",
+            "X-Sidecar-Api-Key": "{sidecarAPIKey}"
+        })
+        const pollResponse = getDictionary(pollRaw)
+        @status = "{pollResponse['status']}"
+
+        if @status == "complete" {
+            @expectedFilePath = "/jobs/{@jobID}/file"
+            @filePath = "{pollResponse['file_url']}"
+            if @filePath != @expectedFilePath {
+                alert("The sidecar returned an unexpected file path.", "Unsafe response")
+                cleanup()
+                stop()
+            }
+            @downloadedFile = downloadURL("{normalizedServerAddress}{@expectedFilePath}", {
+                "CF-Access-Client-Id": "{clientID}",
+                "CF-Access-Client-Secret": "{clientSecret}",
+                "X-Sidecar-Api-Key": "{sidecarAPIKey}"
+            })
+            @complete = "yes"
+        } else {
+            if @status == "failed" {
+                alert("The sidecar job failed.", "Download failed")
+                cleanup()
+                stop()
+            } else {
+                if @status != "queued" && @status != "downloading" {
+                    alert("The sidecar returned an unrecognized job status.", "Invalid response")
+                    cleanup()
+                    stop()
+                }
+            }
+        }
+    }
+}
+
+if @complete == "no" {
+    alert("The download did not finish within 10 minutes. Please try again.", "Download timed out")
+    cleanup()
+    stop()
+}
+
+const downloadedName = getName(@downloadedFile)
+@finalFile = @downloadedFile
+if @mediaKind == "GIF" {
+    const trimmedVideo = trimVideo(@downloadedFile)
+    if !trimmedVideo {
+        cleanup()
+        stop()
+    }
+    const gifData = makeGIF(trimmedVideo)
+    if !gifData {
+        alert("The selected video could not be converted to a GIF.", "GIF creation failed")
+        cleanup()
+        stop()
+    }
+    const gifName = replaceText('\.[^.]+$', ".gif", "{downloadedName}", true, true)
+    @finalFile = setName(gifData, "{gifName}")
+} else {
+    @finalFile = setName(@downloadedFile, "{downloadedName}")
+}
+
+const destinationOptions = list("Save to Photos", "Save to Files", "Share", "Discard")
+const destinationChoice = chooseFromList(destinationOptions, "Keep or discard?")
+if !destinationChoice {
+    cleanup()
+    stop()
+}
+@destination = "{destinationChoice}"
+if @destination == "Save to Photos" {
+    savePhoto(@finalFile)
+    cleanup()
+}
+if @destination == "Save to Files" {
+    saveFilePrompt(@finalFile)
+    cleanup()
+}
+if @destination == "Share" {
+    share(@finalFile)
+    cleanup()
+}
+if @destination == "Discard" {
+    cleanup()
+}
+cleanup()
+stop()

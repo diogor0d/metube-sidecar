@@ -4,4 +4,8 @@ __pycache__/
 .venv/
 data/
 .env
-
+*.egg-info/
+shortcuts/private/
+shortcuts/*_unsigned.shortcut
+shortcuts/*.shortcut
+shortcuts/.tools/
